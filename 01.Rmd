@@ -2,8 +2,7 @@
 title: 'Bayesian power analysis: Part I'
 subtitle: "Prepare to reject $H_0$ with simulation."
 output:
-  github_document:
-    df_print: paged
+  github_document
 ---
 
 ## tl;dr
