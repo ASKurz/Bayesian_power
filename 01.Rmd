@@ -1,0 +1,559 @@
+---
+title: 'Bayesian power analysis: Part I'
+subtitle: "Prepare to reject $H_0$ with simulation."
+output:
+  github_document:
+    df_print: paged
+---
+
+## tl;dr
+
+If you'd like to learn how to do Bayesian power calculations using **brms**, stick around for this 5-part blog series. Here with part I, we'll set the foundation.
+
+## Power is hard, especially for Bayesians.
+
+Many journals, funding agencies, and dissertation committees require power calculations for your primary analyses. Frequentists have a variety of tools available to perform these calculations (e.g., [here](https://rpsychologist.com/analytical-and-simulation-based-power-analyses-for-mixed-design-anovas)). Bayesians, however, have a more difficult time of it. Most of our research questions and data issues are sufficiently complicated that we cannot solve the problems by hand. We need Markov chain Monte Carlo methods to iteratively sample from the posterior to summarize the parameters from our models. Same deal for power. If you'd like to compute the power for a given combination of $N$, likelihood $p(\text{data} | \theta)$, and set of priors $p (\theta)$, you'll need to simulate. 
+
+It's been one of my recent career goals to learn how to do this. You know how they say: *The best way to learn is to teach*. This series of blog posts is the evidence of me learning by teaching. It will be an exploration of what a Bayesian power simulation workflow might look like. The overall statistical framework will be **R**, with an emphasis on code style based on the [**tidyverse**](https://www.tidyverse.org). We'll be fitting our Bayesian models with Bürkner's [**brms**](https://github.com/paul-buerkner/brms).
+
+What this series is not, however, is an introduction to statistical power itself. Keep reading if you're ready to roll up your sleeves, put on your applied hat, and learn how to get things done. If you're more interested in introductions to power, itself, see the references in the next section.
+
+## I make assumptions.
+
+For this series, I'm presuming you are familiar with linear regression, familiar with the basic differences between frequentist and Bayesian approaches to statistics, and have a basic sense of what we mean by statistical power. Here are some resources if you'd like to shore up.
+
+* To learn about Bayesian regression, I recommend the introductory text books by either McElreath ([here](([here]()))) or Kruschke ([here](http://www.indiana.edu/~kruschke/DoingBayesianDataAnalysis/)). Both authors host blogs ([here](http://doingbayesiandataanalysis.blogspot.com) and [here](http://elevanth.org/blog/), respectively). If you go with McElreath, do check out his [online lectures](https://www.youtube.com/channel/UCNJK6_DZvcMqNSzQdEkzvzA/playlists) and [my project](https://bookdown.org/connect/#/apps/1850/access) translating his text to **brms** and **tidyverse** code. I'm working on a [similar project](https://github.com/ASKurz/Doing-Bayesian-Data-Analysis-in-brms-and-the-tidyverse) for Kruschke's text, but it still has a ways to go before I release it in full. 
+* If you're unfamiliar with statistical power, Kruschke covered it in chapter 13 of his text. You might also check out [this review paper](https://www3.nd.edu/~kkelley/publications/articles/Maxwell_Kelley_Rausch_2008.pdf) by Maxwell, Kelley, and Rausch. There's always, of course, the original work by Cohen (e.g., [here](https://www.worldcat.org/title/statistical-power-analysis-for-the-behavioral-sciences/oclc/17877467)).
+* For even more **brms**-related resources, you can find vignettes and documentation [here](https://cran.r-project.org/web/packages/brms/index.html). 
+* For **tidyverse** introductions, your best bets are [*R4DS*](https://r4ds.had.co.nz) and [*The tidyverse style guide*](https://style.tidyverse.org). 
+* We'll be simulating data. If that's new to you, both Kruschke and McElreath cover that a little in their texts. You can find nice online tutorials [here](https://debruine.github.io/tutorials/sim-data.html) and [here](https://aosmith.rbind.io/2018/08/29/getting-started-simulating-data/), too.
+* We'll also be making a couple custom functions. If that's new, you might check out [*R4DS*, chapter 19](https://r4ds.had.co.nz/functions.html) or [chapter 14](https://bookdown.org/rdpeng/rprogdatascience/functions.html) of Roger Peng's *R Programming for Data Science*.
+
+## We need to warm up before jumping into power.
+
+Let's load our primary statistical packages.
+
+```{r, message = F, warning = F}
+library(tidyverse)
+library(brms)
+library(broom)
+```
+
+Consider a case where you have some dependent variable $Y$ that you'd like to compare between two groups, which we'll call treatment and control. Here we presume $Y$ is continuous and, for the sake of simplicity, is in a standardized metric for the control condition. Letting $c$ stand for control and $i$ index the data row for a given case, we might write that as $y_{i, c} \sim \text{Normal} (0, 1)$. The mean for our treatment condition is 0.5, with the standard deviation still in the standardized metric. In the social sciences a standardized mean difference of 0.5 would typically be considered a medium effect size. Here's what that'd look like.
+
+```{r, fig.width = 6, fig.height = 2.25}
+# set our theme because, though I love the default ggplot theme, I hate gridlines
+theme_set(theme_grey() +
+            theme(panel.grid = element_blank()))
+
+# define the means
+mu_c <- 0
+mu_t <- .5
+
+# set up the data
+tibble(x = seq(from = -4, to = 5, by = .01)) %>%
+  mutate(c = dnorm(x, mean = mu_c, sd = 1),
+         t = dnorm(x, mean = mu_t, sd = 1)) %>% 
+  
+  # plot
+  ggplot(aes(x = x, ymin = 0)) +
+  geom_ribbon(aes(ymax = c),
+              size = 0, alpha = 1/3, fill = "grey25") +
+  geom_ribbon(aes(ymax = t),
+              size = 0, alpha = 1/3, fill = "blue2") +
+  geom_text(data = tibble(x = c(-.5, 1),
+                          y = .385,
+                          label = c("control", "treatment"),
+                          hjust = 1:0),
+            aes(y = y, label = label, color = label, hjust = hjust),
+            size = 5, show.legend = F) +
+  scale_x_continuous(NULL, breaks = -4:5) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  scale_color_manual(values = c("grey25", "blue2"))
+```
+
+Sure, those distributions have a lot of overlap. But their means are clearly different and we'd like to make sure we plan on collecting enough data to do a good job showing that. A power analysis will help.
+
+Within the conventional frequentist paradigm, power is the probability of rejecting the null hypothesis $H_0$ in favor of the alternative hypothesis $H_1$, given the alternative hypothesis is true. In this case, the typical null hypothesis is 
+
+$$H_0\text{: } \mu_c = \mu_t,$$
+
+or put differently
+
+$$
+H_0\text{: } \mu_t - \mu_c = 0.
+$$
+
+And the alternative hypothesis is often just
+
+$$H_1\text{: } \mu_c \neq \mu_t,$$
+
+or otherwise put
+
+$$
+H_1\text{: } \mu_t - \mu_c \neq 0.
+$$
+
+Within the regression framework, we'll be comparing $\mu$s using the formula
+
+$$
+\begin{align*}
+y_i & \sim \text{Normal} (\mu_i, \sigma) \\
+\mu_i & = \beta_0 + \beta_1 \text{treatment}_i,
+\end{align*}
+$$
+
+where $\text{treatment}$ is a dummy variable coded 0 = control 1 = treatment and varies across cases indexed by $i$. In this setup, $\beta_0$ is the estimate for $\mu_c$ and $\beta_1$ is the estimate of the difference between condition means, $\mu_t - \mu_c$. Thus our focal parameter, the one we care about the most in our power analysis, will be $\beta_1$.
+
+Within the frequentist paradigm, we typically compare these hypotheses using a $p$-value for $H_0$ with the critical value, $\alpha$, set to .05. Thus, power is the probability we'll have $p < .05$ when it is indeed the case that $\mu_c \neq \mu_t$. We won't actually be computing $p$-values in this project, but we will use 95% intervals. Recall that the result of a Bayesian analysis, the posterior distribution, is the probability of the parameters, given the data $p (\theta | \text{data})$. With our 95% Bayesian credible intervals, we'll be able to describe the parameter space over which our estimate of $\mu_t - \mu_c$ is 95% probable. That is, for our power analysis, we're interested in the probability our 95% credible intervals for $\beta_1$ contain 0 within their bounds when we know a priori $\mu_c \neq \mu_t$. 
+
+The reason we know $\mu_c \neq \mu_t$ is because we'll be simulating the data that way. What our power analysis will help us determine is how many cases we'll need to achieve a predetermined level of power. The conventional threshold is .8.
+
+### Dry run number 1.
+
+To make this all concrete, let's start with a simple example. We'll simulate a single set of data, fit a Bayesian regression model, and examine the results for the critical parameter $\beta_1$. For the sake of simplicity, let's keep our two groups, treatment and control, the same size. We'll start with $n = 50$ for each condition.
+
+```{r}
+n <- 50
+```
+
+We already decided above that
+
+$$
+\begin{align*}
+y_{i, c} & \sim \text{Normal} (0, 1) \text{ and}\\
+y_{i, t} & \sim \text{Normal} (0.5, 1).
+\end{align*}
+$$
+
+Here's how we might simulate data along those lines.
+
+```{r}
+set.seed(1)
+
+d <-
+  tibble(group     = rep(c("control", "treatment"), each = n)) %>% 
+  mutate(treatment = ifelse(group == "control", 0, 1),
+         y         = ifelse(group == "control", 
+                            rnorm(n, mean = mu_c, sd = 1),
+                            rnorm(n, mean = mu_t, sd = 1)))
+
+glimpse(d)
+```
+
+In case it wasn’t clear, the two variables `group` and `treatment` are redundant. Whereas the former is composed of names, the latter is the dummy-variable equivalent. The main event was how we used the `nrorm()` function to simulate the normally-distributed values for `y`.
+
+Before we fit our model, we need to decide on priors. To give us ideas, here are the **brms** defaults for our model and data.
+
+```{r}
+get_prior(data = d,
+          family = gaussian,
+          y ~ 0 + intercept + treatment)
+```
+
+A few things: Notice that here we’re using the `0 + intercept` syntax. This is because **brms** handles the priors for the default intercept under the presumption you’ve mean-centered all your predictor variables. However, since our `treatment` variable is a dummy, that assumption won’t fly. The `0 + intercept` allows us to treat the model intercept as just another $\beta$ parameter, which makes no assumptions about centering. Along those lines, you’ll notice **brms** currently defaults to improper flat priors for the $\beta$ parameters (i.e., those for which `class = b`). And finally, the default prior on $\sigma$ is a permissive `student_t(3, 0, 10)`. By default, **brms** also sets the left bounds for $\sigma$ parameters at zero, making that a half-$t$ distribution. If you’re confused by these details, spend some time with the [**brms** reference manual](https://cran.r-project.org/web/packages/brms/brms.pdf), particularly the `brm` and `brmsformula` sections.
+
+In this project, we'll be primarily using two kinds of priors: default flat priors and weakly-regularizing priors. Hopefully flat priors are self-explanatory. They let the likelihood dominate the posterior and tend to produce results similar to those from frequentist estimators. 
+
+As for weakly-regularizing priors, McElreath covered them in his text. They're mentioned a bit in the **Stan** team's [*Prior Choice Recommendations*](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations) wiki, and you can learn even more from Gelman, Simpson, and Betancourt's [*The prior can only be understood in the context of the likelihood*](http://www.stat.columbia.edu/~gelman/research/published/entropy-19-00555-v2.pdf). These priors aren’t strongly informative and aren't really representative of our research hypotheses. But they're not flat, either. Rather, with just a little bit of knowledge about the data, these priors are set to keep the MCMC chains on target. Since our `y` variable has a mean near zero and a standard deviation near 1 and since our sole predictor, `treatment` is a dummy, setting $\text{Normal} (0, 2)$ as the prior for both $\beta$ parameters might be a good place to start. The prior is permissive enough that it will let likelihood dominate the posterior, but it also rules out ridiculous parts of the parameter space (e.g., a standardized mean difference of 20, an intercept of -93). And since we know the data are on the unit scale, we might just center our half-Student-$t$ prior on 1 and add a gentle scale setting of 1.
+
+Feel free to disagree and use your own priors. The point, here, is settle on the priors you'd use in the future with the real data. Select ones you'd feel comfortable defending to a skeptical reviewer.
+
+Here's how we might fit the model.
+
+```{r fit, cache = T, warning = F, message = F, results = "hide"}
+fit <-
+  brm(data = d,
+      family = gaussian,
+      y ~ 0 + intercept + treatment,
+      prior = c(prior(normal(0, 2), class = b),
+                prior(student_t(3, 1, 1), class = sigma)),
+      seed = 1)
+```
+
+Before we look at the summary, we might check the chains in a trace plot.
+
+```{r, fig.width = 8, fig.height = 4}
+plot(fit)
+```
+
+Yep, the chains all look good. Here's the parameter summary.
+
+```{r}
+print(fit)
+```
+
+The 95% credible intervals for our $\beta_1$ parameter, termed `treatment` in the output, are well above zero.
+
+Another way to look at the model summary is with the handy `broom::tidy()` function.
+
+```{r}
+tidy(fit, prob = .95)
+```
+
+It's important to keep in mind that by default, `tidy()` returns 90% intervals for `brm()` fit objects. To get the conventional 95% intervals, you'll need to specify `prob = .95`. The intervals are presented for each parameter in the `lower` and `upper` columns. Once we start simulating in bulk, the `tidy()` function will come in handy. You'll see.
+
+### You can reuse a fit.
+
+Especially with simple models like this, a lot of the time we spend waiting for `brms::brm()` to return the model is wrapped up in compilation. This is because **brms** is a collection of user-friendly functions designed to fit models with [**Stan**](https://mc-stan.org). With each new model, `brm()` translates your model into **Stan** code, which then gets translated to C++ and is compiled afterwards (see [here](https://cran.r-project.org/web/packages/brms/vignettes/brms_overview.pdf) or [here](https://cran.r-project.org/web/packages/brms/brms.pdf)). However, we can use the `update()` function to update a previously-compiled fit object with new data. This cuts out the compilation time and allows us to get directly to sampling. Here’s how to do it.
+
+```{r updated_fit, cache = T, warning = F, message = F, results = "hide"}
+# set a new seed
+set.seed(2)
+
+# simulate new data based on that new seed
+d <-
+  tibble(group     = rep(c("control", "treatment"), each = n)) %>% 
+  mutate(treatment = ifelse(group == "control", 0, 1),
+         y         = ifelse(group == "control", 
+                            rnorm(n, mean = mu_c, sd = 1),
+                            rnorm(n, mean = mu_t, sd = 1)))
+
+updated_fit <-
+  update(fit,
+         newdata = d,
+         seed = 2)
+```
+
+Behold the `tidy()` summary of our updated model.
+
+```{r}
+tidy(updated_fit, prob = .95)
+```
+
+Well how about that? In this case, our 95% credible intervals for $\beta_1$ did include 0 within their bounds. Though the posterior mean, 0.30, is still well away from zero, here we'd fail to reject $H_0$ at the conventional level. This is why we simulate.
+
+To recap, we've 
+
+a. determined our primary data type, 
+b. cast our research question in terms of a regression model,
+c. identified the parameter of interest, 
+d. settled on defensible priors, 
+e. picked an initial sample size, 
+f. fit an initial model with a single simulated data set, and 
+g. practiced reusing that fit with `update()`. 
+
+We're more than half way there! It's time to do our first power simulation.
+
+## Simulate to determine power.
+
+In this post, we'll play with three ways to do a Bayesian power simulation. They'll all be similar, but hopefully you'll learn a bit as we transition from one to the next. Though if you're impatient and all this seems remedial, you could probably just skip down to the final example, Version 3.
+
+### Version 1: Let's introduce making a custom model-fitting function.
+
+For our power analysis, we'll need to simulate a large number of data sets, each of which we'll fit a model to. Here we'll make a custom function, `sim_d()`, that will simulate new data sets just like before. Our function will have two parameters: we'll set our seeds with `seed` and determine how many cases we'd like per group with `n`. 
+
+```{r}
+sim_d <- function(seed, n) {
+  
+  mu_t <- .5
+  mu_c <- 0
+
+  set.seed(seed)
+  
+  tibble(group     = rep(c("control", "treatment"), each = n)) %>% 
+  mutate(treatment = ifelse(group == "control", 0, 1),
+         y         = ifelse(group == "control", 
+                            rnorm(n, mean = mu_c, sd = 1),
+                            rnorm(n, mean = mu_t, sd = 1)))
+}
+```
+
+Here's a quick example of how our function works.
+
+```{r}
+sim_d(seed = 123, n = 2)
+```
+
+Now we're ready to get down to business. We’re going to be saving our simulation results in a nested data frame, `s`. Initially, `s` will have one column of `seed` values. These will serve a dual function. First, they are the values we’ll be feeding into the `seed` argument of our custom data-generating function, `sim_d()`. Second, since the `seed` values serially increase, they also stand in as iteration indexes. 
+
+For our second step, we add the data simulations and save them in a nested column, `d`. In the first argument of the `purrr::map()` function, we indicate we want to iterate over the values in `seed`. In the second argument, we indicate we want to serially plug those `seed` values into the first argument within the `sim_d()` function. That argument, recall, is the well-named `seed` argument. With the final argument in `map()`, `n = 50`, we hard code 50 into the `n` argument of `sim_d()`. 
+
+For the third step, we expand our `purrr::map()` skills from above to `purrr::map2()`, which allows us to iteratively insert two arguments into a function. Within this paradigm, the two arguments are generically termed `.x` and `.y`. Thus our approach will be `.x = d, .y = seed`. For our function, we specify `~update(fit, newdata = .x, seed = .y)`. Thus we'll be iteratively inserting our simulated `d` data into the `newdata` argument and will be simultaneously inserting our `seed` values into the `seed` argument.
+
+Also notice that the number of iterations we'll be working with is determined by the number of rows in the `seed` column. We are defining that number as `n_sim`. Since this is just a blog post, I'm going to take it easy and use 100. But if this was a real power analysis for one of your projects, something like 1000 would be better. 
+
+Finally, you don’t have to do this, but I'm timing my simulation by saving `Sys.time()` values at the beginning and end of the simulation. 
+
+```{r s, cache = T, warning = F, message = F, results = "hide"}
+# how many simulations would you like?
+n_sim <- 100
+
+# this will help us track time
+t1 <- Sys.time()
+
+# here's the main event!
+s <-
+  tibble(seed = 1:n_sim) %>% 
+  mutate(d    = map(seed, sim_d, n = 50)) %>% 
+  mutate(fit  = map2(d, seed, ~update(fit, newdata = .x, seed = .y)))
+
+t2 <- Sys.time()
+```
+
+The entire simulation took just a couple minutes on my several-year-old laptop. 
+
+```{r}
+t2 - t1
+```
+
+Your mileage may vary.
+
+Let's take a look at what we've done.
+
+```{r}
+head(s)
+```
+
+In our 100-row nested tibble, we have all our simulated data sets in the `d` column and all of our **brms** fit objects nested in the `fit` column. Next we'll use `broom::tidy()` and a little wrangling to extract the parameter of interest, `b_treatment` (i.e., $\beta_1$), from each simulation.
+
+```{r}
+s %>% 
+  mutate(treatment = map(fit, tidy, prob = .95)) %>% 
+  unnest(treatment) %>% 
+  filter(term == "b_treatment") %>% 
+  head()
+```
+
+As an aside, I know I'm moving kinda fast with all this wacky `purrr::map()`/`purrr::map2()` stuff. If you're new to using the **tidyverse** for iterating and saving the results in nested data structures, I recommend fixing an adult beverage and cozying up with Hadley Wickham's presentation, [*Managing many models*](https://www.youtube.com/watch?v=rz3_FDVt9eg). And if you really hate it, both Kruschke and McElreath texts contain many examples of how to iterate in a more base **R** sort of way.
+
+Anyway, here's what those 100 $\beta_1$ summaries look like in bulk.
+
+```{r, fig.width = 8, fig.height = 3}
+s %>% 
+  mutate(treatment = map(fit, tidy, prob = .95)) %>% 
+  unnest(treatment) %>% 
+  filter(term == "b_treatment") %>% 
+  
+  ggplot(aes(x = seed, y = estimate, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = c(0, .5), color = "white") +
+  geom_pointrange(fatten = 1/2) +
+  labs(x = "seed (i.e., simulation index)",
+       y = expression(beta[1]))
+```
+
+The horizontal lines show the idealized effect size (0.5) and the null hypothesis (0). Already, it's apparent that most of our intervals indicate there's more than a 95% probability the null hypothesis is not credible. Several do. Here's how to quantify that.
+
+```{r}
+s %>% 
+  mutate(treatment = map(fit, tidy, prob = .95)) %>% 
+  unnest(treatment) %>% 
+  filter(term == "b_treatment") %>% 
+  mutate(check = ifelse(lower > 0, 1, 0)) %>% 
+  summarise(power = mean(check))
+```
+
+With the second `mutate()` line, we used a logical statement within `ifelse()` to code all instances where the lower limit of the 95% interval was greater than 0 as a 1, with the rest as 0. That left us with a vector of 1s and 0s, which we saved as `check`. In the `summarise()` line, we took the mean of that column, which returned our Bayesian power estimate.
+
+That is, in 67 of our 100 simulations, an $n = 50$ per group was enough to produce a 95% Bayesian credible interval that did not straddle 0.
+
+I should probably point out that a 95% interval for which `upper < 0` would have also been consistent with the alternative hypothesis of $\mu_c \neq \mu_t$. However, I didn't bother to work that option into the definition of our `check` variable because I knew from the outset that that would be a highly unlikely result. But if you'd like to work more rigor into your checks, by all means do.
+
+And if you've gotten this far and have been following along with code of your own, congratulations! You did it! You've estimated the power of a Bayesian model with a given $n$. Now let's refine our approach.
+
+### Version 2: We might should be more careful with memory.
+
+I really like it that our `s` object contains all our `brm()` fits. It makes it really handy to do global diagnostics like making sure our $\hat R$ values are all within a respectable range.
+
+```{r, fig.width = 3, fig.height = 2.5}
+s %>% 
+  mutate(rhat = map(fit, rhat)) %>% 
+  unnest(rhat) %>% 
+  
+  ggplot(aes(x = rhat)) +
+  geom_histogram(bins = 20)
+```
+
+Man those $\hat R$ values look sweet. But so anyway, holding on to all those fits can take up a lot of memory. If the only thing you're interested in are the parameter summaries, a better approach might be to do the model refitting and parameter extraction in one step. That way you only save the parameter summaries. Here's how you might do that.
+
+```{r s2, cache = T, warning = F, message = F, results = "hide"}
+t3 <- Sys.time()
+
+s2 <-
+  tibble(seed = 1:n_sim) %>% 
+  mutate(d    = map(seed, sim_d, n = 50)) %>% 
+  # here's the new part
+  mutate(tidy = map2(d, seed, ~update(fit, newdata = .x, seed = .y) %>% 
+                       tidy(prob = .95) %>% 
+                       filter(term == "b_treatment")))
+
+t4 <- Sys.time()
+```
+
+Like before, this only took a couple minutes.
+
+```{r}
+t4 - t3
+```
+
+As a point of comparison, here are the sizes of the results from our first approach to those from the second.
+
+```{r}
+object.size(s)
+object.size(s2)
+```
+
+That's a big difference. Hopefully you get the idea. With more complicated models and 10+ times the number of simulations, size will eventually matter.
+
+Anyway, here are the results.
+
+```{r, fig.width = 8, fig.height = 3}
+s2 %>% 
+  unnest(tidy) %>% 
+
+  ggplot(aes(x = seed, y = estimate, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = c(0, .5), color = "white") +
+  geom_pointrange(fatten = 1/2) +
+  labs(x = "seed (i.e., simulation index)",
+       y = expression(beta[1]))
+```
+
+Same basic deal, lower memory burden.
+
+### Version 3: Still talking about memory, we can be even stingier.
+
+So far, both of our simulation attempts resulted in our saving the simulated data sets. It's a really nice option if you ever want to go back and take a look at those simulated data. For example, you might want to inspect a random subset of the data simulations with box plots.
+
+```{r, fig.width = 6, fig.height = 5}
+set.seed(1)
+
+s2 %>% 
+  sample_n(12) %>% 
+  unnest(d) %>% 
+  
+  ggplot(aes(x = group, y = y)) +
+  geom_boxplot(aes(fill = group), 
+               alpha = 2/3, show.legend = F) +
+  scale_fill_manual(values = c("grey25", "blue2")) +
+  xlab(NULL) +
+  facet_wrap(~seed)
+```
+
+In this case, it's no big deal if we keep the data around or not. The data sets are fairly small and we're only simulating 100 of them. But in cases where the data are larger and you're doing 1000s of simulations, keeping the data could become a memory drain.
+
+If you're willing to forgo the luxury of inspecting your data simulations, it might make sense to run our power analysis in a way that avoids saving them. One way to do so would be to just wrap the data simulation and model fitting all in one function. We'll call it `sim_d_and_fit()`.
+
+```{r}
+sim_d_and_fit <- function(seed, n) {
+  
+  mu_t <- .5
+  mu_c <- 0
+  
+  set.seed(seed)
+  
+  d <-
+    tibble(group     = rep(c("control", "treatment"), each = n)) %>% 
+    mutate(treatment = ifelse(group == "control", 0, 1),
+           y         = ifelse(group == "control", 
+                              rnorm(n, mean = mu_c, sd = 1),
+                              rnorm(n, mean = mu_t, sd = 1)))
+  
+  update(fit,
+         newdata = d, 
+         seed = seed) %>% 
+    tidy(prob = .95) %>% 
+    filter(term == "b_treatment")
+}
+```
+
+Now iterate 100 times once more.
+
+```{r s3, cache = T, warning = F, message = F, results = "hide"}
+t5 <- Sys.time()
+
+s3 <-
+  tibble(seed = 1:n_sim) %>% 
+  mutate(tidy = map(seed, sim_d_and_fit, n = 50)) %>% 
+  unnest(tidy)
+
+t6 <- Sys.time()
+```
+
+That was pretty quick.
+
+```{r}
+t6 - t5
+```
+
+Here's what it returned.
+
+```{r}
+head(s3)
+```
+
+By wrapping our data simulation, model fitting, and parameter extraction steps all in one function, we simplified the output such that we're no longer holding on to the data simulations or the **brms** fit objects. We just have the parameter summaries and the `seed`, making the product even smaller.
+
+```{r}
+object.size(s)
+object.size(s2)
+object.size(s3)
+```
+
+But the primary results are the same.
+
+```{r, fig.width = 8, fig.height = 3}
+s3 %>% 
+  ggplot(aes(x = seed, y = estimate, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = c(0, .5), color = "white") +
+  geom_pointrange(fatten = 1/2) +
+  labs(x = "seed (i.e., simulation index)",
+       y = expression(beta[1]))
+```
+
+We still get the same power estimate, too.
+
+```{r}
+s3 %>% 
+  mutate(check = ifelse(lower > 0, 1, 0)) %>% 
+  summarise(power = mean(check))
+```
+
+## Next steps
+
+*But my goal was to figure out what $n$ will get me power of .8 or more!*, you say. Fair enough. Try increasing `n` to 65 or something. 
+
+Welcome to the world of simulation. Since our Bayesian models are complicated, we don't have the luxury of plugging a few values into some quick power formula. Just as simulation is an iterative process, determining on the right values to simulate over might well be an iterative process, too.
+
+## Wrap-up
+
+Anyway, that's the essence of the **brms/tidyverse** workflow for Bayesian power analysis. You follow these steps:
+
+1. Determine your primary data type.
+2. Determine your primary regression model and parameter(s) of interest.
+3. Pick defensible priors for all parameters.
+4. Select a sample size.
+5. Fit an initial model and save the fit object.
+6. Simulate some large number of data sets all following your prechosen form and use the `update()` function to iteratively fit the models.
+7. Extract the parameter(s) of interest. 
+8. Summarize.
+
+In addition, we played with a few approaches based on logistical concerns like memory. In the next post, part II, we'll see how the precision-oriented approach is an alternative to power focused on rejecting null hypotheses.
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
+```{r, eval = F}
+# If you increase n to 65, the power becomes about .84
+n_sim <- 100
+
+t7 <- Sys.time()
+
+s4 <-
+  tibble(seed = 1:n_sim) %>% 
+  mutate(tidy = map(seed, sim_d_and_fit, n = 65))
+
+t8 <- Sys.time()
+
+t8 - t7
+
+object.size(s4)
+
+s4 %>% 
+  unnest(tidy) %>% 
+  mutate(check = ifelse(lower > 0, 1, 0)) %>% 
+  summarise(power = mean(check))
+```
+
