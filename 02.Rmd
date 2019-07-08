@@ -302,9 +302,7 @@ s7 %>%
 
 ## How are we defining our widths?
 
-In frequentist analyses, we typically work with 95% confidence intervals because of their close connection to the conventional $p < .05$ threshold. Another consequence of dropping our focus on rejecting $H_0$ is that it no longer seems necessary to evaluate our posteriors with 95% intervals. And as it turns out, some Bayesians aren't fans of the 95% interval. McElreath, for example, defiantly used 89% intervals in his [text](http://xcelab.net/rm/statistical-rethinking/) and Gelman has [blogged](https://statmodeling.stat.columbia.edu/2016/11/05/why-i-prefer-50-to-95-intervals/) on his fondness for 50% intervals. 
-
-That in mind, let's evaluate an $n$ based on 50% intervals. This will require us to update our `sim_d_and_fit()` function to allow us to change the `prob` setting in the `broom::tidy()` funciton.
+In frequentist analyses, we typically work with 95% confidence intervals because of their close connection to the conventional $p < .05$ threshold. Another consequence of dropping our focus on rejecting $H_0$ is that it no longer seems necessary to evaluate our posteriors with 95% intervals. And as it turns out, some Bayesians aren't fans of the 95% interval. McElreath, for example, defiantly used 89% intervals in his [text](http://xcelab.net/rm/statistical-rethinking/) and Gelman has [blogged](https://statmodeling.stat.columbia.edu/2016/11/05/why-i-prefer-50-to-95-intervals/) on his fondness for 50% intervals. We'll follow along and practice evaluating an $n$ based on 50% intervals. This will require us to update our `sim_d_and_fit()` function to allow us to change the `prob` setting in the `broom::tidy()` function.
 
 ```{r}
 sim_d_and_fit <- function(seed, n, prob) {
@@ -352,8 +350,7 @@ s8 %>%
   geom_rug(size = 1/6)
 ```
 
-
-Since we've gone from 95% to 50% intervals, it should be no surprise that their widths are substantially more narrow. Accordingly, we should evaluate then with a higher standard. Perhaps it's more reasonable to ask for an average width of 0.1. Let's see how close $n = 100$ gets us.
+Since we've gone from 95% to 50% intervals, it should be no surprise that their widths are substantially more narrow. Accordingly, we should evaluate then with a higher standard. Perhaps it's more reasonable to ask for an average width of 0.1. Let's see how close $n = 150$ gets us.
 
 ```{r s9, cache = T, warning = F, message = F, results = "hide"}
 s9 <-
@@ -372,7 +369,7 @@ s9 %>%
   geom_rug(size = 1/6)
 ```
 
-Nope, we’re not there yet. Perhaps $n = 200$ or $250$ is the ticket. You get the idea. Anyway, once we're talking that AIPE/precision/interval-width talk, we can get all kinds of creative with which intervals we're even interested in. As far as I can tell, the topic is wide open for fights and collaborations between statisticians, methodologists, and substantive researchers to find sensible ways forward. 
+Nope, we're not there yet. Perhaps $n = 200$ or $250$ is the ticket. You get the idea. Anyway, once we're talking that AIPE/precision/interval-width talk, we can get all kinds of creative with which intervals we're even interested in. As far as I can tell, the topic is wide open for fights and collaborations between statisticians, methodologists, and substantive researchers to find sensible ways forward. 
 
 Maybe you should write a dissertation on it.
 
