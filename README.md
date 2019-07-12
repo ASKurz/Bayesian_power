@@ -2,7 +2,7 @@ I'm planning to release a series of blog posts walking out Bayesian power analys
 
 * Part I: Intro to simulation, focus on rejecting the null
 * Part II: Alternative approach: focusing on interval widths
-* Part III: Putting Gauss aside to explore models with Poison and binomial likelihoods
+* Part III: Putting Gauss aside to explore models with Poisson and binomial likelihoods
 * Part IV: Introduction to simulations with multilevel models
 * Part V: Using frequentist simulations to inform Bayesian simulations
 
