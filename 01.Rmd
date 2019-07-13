@@ -71,7 +71,7 @@ tibble(x = seq(from = -4, to = 5, by = .01)) %>%
   scale_color_manual(values = c("grey25", "blue2"))
 ```
 
-Sure, those distributions have a lot of overlap. But their means are clearly different and we'd like to make sure we plan on collecting enough data to do a good job showing that. A power analysis will help.
+Sure, those distributions have a lot of overlap. But their means are clearly different and we'd like to make sure we plan on collecting enough data to do a good job showing that. A precision analysis will help.
 
 Within the conventional frequentist paradigm, power is the probability of rejecting the null hypothesis $H_0$ in favor of the alternative hypothesis $H_1$, given the alternative hypothesis is true. In this case, the typical null hypothesis is 
 
