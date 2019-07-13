@@ -38,7 +38,7 @@ library(brms)
 library(broom)
 ```
 
-Consider a case where you have some dependent variable $Y$ that you'd like to compare between two groups, which we'll call treatment and control. Here we presume $Y$ is continuous and, for the sake of simplicity, is in a standardized metric for the control condition. Letting $c$ stand for control and $i$ index the data row for a given case, we might write that as $y_{i, c} \sim \text{Normal} (0, 1)$. The mean for our treatment condition is 0.5, with the standard deviation still in the standardized metric. In the social sciences a standardized mean difference of 0.5 would typically be considered a medium effect size. Here's what that'd look like.
+Consider a case where you have some dependent variable $Y$ that you'd like to compare between two groups, which we'll call treatment and control. Here we presume $Y$ is continuous and, for the sake of simplicity, is a standardized (z-scored) measure of the control condition. Letting $c$ stand for control and $i$ index the data row for a given case, we might write that as $y_{i, c} \sim \text{Normal} (0, 1)$. The mean for our treatment condition is 0.5, with a standard deviation of 1.0 considering we're assuming a standardized (z-scored) dependent variable. In the social sciences a standardized mean difference of 0.5 would typically be considered a "medium" effect size. Here's what that'd look like.
 
 ```{r, fig.width = 6, fig.height = 2.25}
 # set our theme because, though I love the default ggplot theme, I hate gridlines
