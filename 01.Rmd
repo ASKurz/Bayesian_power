@@ -9,7 +9,7 @@ output:
 
 If you'd like to learn how to do Bayesian power calculations using **brms**, stick around for this 5-part blog series. Here with part I, we'll set the foundation.
 
-## Power and precision, mirrors depending on philosophy.
+## Power and precision, mirrors depending on philosophy
 
 Many journals, funding agencies, and dissertation committees require power calculations for your primary analyses. Frequentists have a variety of tools available to perform these calculations (e.g., [here](https://rpsychologist.com/analytical-and-simulation-based-power-analyses-for-mixed-design-anovas)). Bayesians, however, use different concepts and language to answer the same types of questions that power analysis helps Frequentists answer. Sometimes reviewers may even be unaware of the Bayesian counterparts to common Frequentist concepts like precision to power. In contrast to Frequentist power analyses, Bayesian precision analysis always uses simulation instead of sometimes using analytical calculations (algebra). If you'd like to compute the precision for a given combination of $N$, likelihood $p(\text{data} | \theta)$, and set of priors $p (\theta)$, you'll need to simulate.
 
@@ -17,7 +17,7 @@ It's been one of my recent career goals to learn how to do this. You know how th
 
 What this series is not, however, is an introduction to statistical power itself. Keep reading if you're ready to roll up your sleeves, put on your applied hat, and learn how to get things done. If you're more interested in introductions to power, itself, see the references in the next section.
 
-## I make assumptions.
+## I make assumptions
 
 For this series, I'm presuming you are familiar with linear regression, familiar with the basic differences between frequentist and Bayesian approaches to statistics, and have a basic sense of what we mean by statistical power. Here are some resources if you'd like to shore up.
 
