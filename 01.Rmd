@@ -28,9 +28,9 @@ For this series, I'm presuming you are familiar with linear regression, familiar
 * We'll be simulating data. If that's new to you, both Kruschke and McElreath cover that a little in their texts. You can find nice online tutorials [here](https://debruine.github.io/tutorials/sim-data.html) and [here](https://aosmith.rbind.io/2018/08/29/getting-started-simulating-data/), too.
 * We'll also be making a couple custom functions. If that's new, you might check out [*R4DS*, chapter 19](https://r4ds.had.co.nz/functions.html) or [chapter 14](https://bookdown.org/rdpeng/rprogdatascience/functions.html) of Roger Peng's *R Programming for Data Science*.
 
-## We need to warm up before jumping into power.
+## We need to warm up before jumping into precision
 
-Let's load our primary statistical packages.
+Let's load some helpful packages. **tidyverse** helps organize data, **brms** model data, and **broom** organize insights from models.
 
 ```{r, message = F, warning = F}
 library(tidyverse)
