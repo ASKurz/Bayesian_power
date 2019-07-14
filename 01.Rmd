@@ -5,6 +5,10 @@ output:
   github_document
 ---
 
+```{r, echo=FALSE}
+knitr::opts_chunk$set(fig.align = 'center')
+```
+
 ## tl;dr
 
 If you'd like to learn how to do Bayesian power calculations using **brms**, stick around for this 5-part blog series. Here with part I, we'll set the foundation.
@@ -104,9 +108,9 @@ $$
 
 where $\text{treatment}$ is a dummy variable coded 0 = control 1 = treatment and varies across cases indexed by $i$. In this setup, $\beta_0$ is the estimate for $\mu_c$ and $\beta_1$ is the estimate of the difference between condition means, $\mu_t - \mu_c$. Thus our focal parameter, the one we care about the most in our power analysis, will be $\beta_1$.
 
-Within the Frequentist paradigm, we typically compare these hypotheses using a $p$-value for $H_0$ with the critical value, $\alpha$, set to .05. Thus, power is the probability we'll have $p < .05$ when it is indeed the case that $\mu_c \neq \mu_t$. We won't actually be computing $p$-values in this project, but we will use 95% intervals. Recall that the result of a Bayesian analysis, the posterior distribution, is the probability of the parameters, given the data $p (\theta | \text{data})$. With our 95% Bayesian credible intervals, we'll be able to describe the parameter space over which our estimate of $\mu_t - \mu_c$ is 95% probable. That is, for our power analysis, we're interested in the probability our 95% credible intervals for $\beta_1$ contain 0 within their bounds when we know a priori $\mu_c \neq \mu_t$.
+Within the Frequentist paradigm, we typically compare these hypotheses using a $p$-value for $H_0$ with the critical value, $\alpha$, set to 0.05. Thus, power is the probability we'll have $p < 0.05$ when it is indeed the case that $\mu_c \neq \mu_t$. We won't be computing $p$-values in this project, but we will use 95% intervals. Recall that the result of a Bayesian analysis, the posterior distribution, is the probability of the parameters, given the data $p (\theta | \text{data})$. With our 95% Bayesian credible intervals, we'll be able to describe the parameter space over which our estimate of $\mu_t - \mu_c$ is 95% probable. That is, for our precision analysis, we're interested in the probability our 95% credible intervals for $\beta_1$ contain zero (0) within their bounds when we know a priori $\mu_c \neq \mu_t$.
 
-The reason we know $\mu_c \neq \mu_t$ is because we'll be simulating the data that way. What our power analysis will help us determine is how many cases we'll need to achieve a predetermined level of power. The conventional threshold is .8.
+The reason we know $\mu_c \neq \mu_t$ is because we'll be simulating the data that way. What our precision analysis will help us determine is how many cases we'll need to achieve a predetermined interval width so that some % of simulation "true" values aren't included in our interval. The conventional threshold is 0.8.
 
 ### Dry run number 1.
 
