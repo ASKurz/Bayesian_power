@@ -144,7 +144,7 @@ d <-
 glimpse(d)
 ```
 
-In case it wasn’t clear, the two variables `group` and `treatment` are redundant. Whereas the former is composed of names, the latter is the dummy-variable equivalent. The main event was how we used the `nrorm()` function to simulate the normally-distributed values for `y`.
+In case it wasn’t clear, the two variables `group` and `treatment` are redundant. Whereas the former is composed of names, the latter is the dummy-variable equivalent. The main event was how we used the `rnorm()` function to simulate the normally-distributed values for `y`.
 
 Before we fit our model, we need to decide on priors. To give us ideas, here are the **brms** defaults for our model and data.
 
@@ -165,13 +165,12 @@ Feel free to disagree and use your own priors. The point, here, is settle on the
 Here's how we might fit the model.
 
 ```{r fit, cache = T, warning = F, message = F, results = "hide"}
-fit <-
-  brm(data = d,
-      family = gaussian,
-      y ~ 0 + intercept + treatment,
-      prior = c(prior(normal(0, 2), class = b),
-                prior(student_t(3, 1, 1), class = sigma)),
-      seed = 1)
+fit <- brm(data = d,
+           family = gaussian,
+           y ~ 0 + intercept + treatment,
+           prior = c(prior(normal(0, 2), class = b),
+                     prior(student_t(3, 1, 1), class = sigma)),
+           seed = 1)
 ```
 
 Before we look at the summary, we might check the chains in a trace plot.
@@ -556,7 +555,7 @@ object.size(s4)
 
 s4 %>% 
   unnest(tidy) %>% 
-  mutate(check = ifelse(lower > 0, 1, 0)) %>% 
+  mutate(check = ifelse(lower > 0, 1, 0)) %>%
   summarise(power = mean(check))
 ```
 
