@@ -1,5 +1,5 @@
 ---
-title: 'Bayesian power analysis: Part III. All the world isn't a Gauss.'
+title: "Bayesian power analysis: Part III. All the world isn't a Gauss."
 output:
   github_document
 ---
