@@ -1,6 +1,5 @@
 ---
-title: 'Bayesian power analysis: Part III'
-subtitle: "All the world isn't a Gauss."
+title: 'Bayesian power analysis: Part III. All the world isn't a Gauss.'
 output:
   github_document
 ---
@@ -17,7 +16,7 @@ In the social sciences, count data arise when we ask questions like:
 * How many pets do you have at home?
 * How many cigarettes did you smoke, yesterday?
 
-The values these data will take are discrete [^1] in that you've either slept with 9 or 10 people, but definitely not 9.5. The values cannot go below zero in that even if you quit smoking cold turkey 15 years ago and have been a health nut since, you still could not have smoked -3 cigarettes, yesterday. Zero is as low as it goes. 
+The values these data will take are discrete [^1] in that you've either slept with 9 or 10 people, but definitely not 9.5. The values cannot go below zero in that even if you quit smoking cold turkey 15 years ago and have been a health nut since, you still could not have smoked -3 cigarettes, yesterday. Zero is as low as it goes.
 
 The canonical distribution for data of this type--non-zero integers--is the Poisson. It's named after the French mathematician Siméon Denis Poisson, [who had quite the confident stare in his youth](https://upload.wikimedia.org/wikipedia/commons/e/e8/E._Marcellot_Siméon-Denis_Poisson_1804.jpg). The Poisson distribution has one parameter, $\lambda$, which controls both its mean and variance. Although the numbers the Poisson describes are counts, the $\lambda$ parameter does not need to be an integer. For example, here's the plot of 1000 draws from a Poisson for which $\lambda = 3.2$.
 
@@ -35,7 +34,7 @@ tibble(x = rpois(n = 1e3, lambda = 3.2)) %>%
 
 In case you missed it, the key function for generating those data was `rpois()`. I'm not going to go into a full-blown tutorial on the Poisson distribution or on count regression. For more thorough introductions, check out Atkins et al's [*A tutorial on count regression and zero-altered count models for longitudinal substance use data*](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3513584/pdf/nihms396181.pdf), chapters 9 through 11 in McElreath's [*Statistical Rethinking*](https://xcelab.net/rm/statistical-rethinking/), or, if you really want to dive in, Agresti's [*Foundations of Linear and Generalized Linear Models*](https://www.wiley.com/en-us/Foundations+of+Linear+and+Generalized+Linear+Models-p-9781118730034).
 
-For our power example, let's say you were interested in drinking. Using data from [the National Epidemiologic Survey on Alcohol and Related Conditions](https://pubs.niaaa.nih.gov/publications/AA70/AA70.htm), Christopher Ingraham presented [a data visualization](https://www.washingtonpost.com/news/wonk/wp/2014/09/25/think-you-drink-a-lot-this-chart-will-tell-you/?utm_term=.b81599bbbe25) of the average number of alcoholic drinks American adults consume, per week. By decile, the numbers were: 
+For our power example, let's say you were interested in drinking. Using data from [the National Epidemiologic Survey on Alcohol and Related Conditions](https://pubs.niaaa.nih.gov/publications/AA70/AA70.htm), Christopher Ingraham presented [a data visualization](https://www.washingtonpost.com/news/wonk/wp/2014/09/25/think-you-drink-a-lot-this-chart-will-tell-you/?utm_term=.b81599bbbe25) of the average number of alcoholic drinks American adults consume, per week. By decile, the numbers were:
 
 1. 0.00
 2. 0.00 
@@ -75,8 +74,8 @@ This will be our primary data type. Our next step is to determine how to express
 
 $$
 \begin{align*}
-\text{drinks_per_week}_i & \sim \text{Poisson}(\lambda_i) \\
-\text{log} (\lambda_i)   & = \beta_0 + \beta_1 \text{high}_i.
+\text{drinks_per_week}_i         & \sim \text{Poisson}(\lambda_i) \\
+\operatorname{log} (\lambda_i)   & = \beta_0 + \beta_1 \text{high}_i.
 \end{align*}
 $$
 
@@ -115,7 +114,7 @@ fit1 <-
 print(fit1)
 ```
 
-Since we used the log link, our model results are in the log metric, too. If you'd like them in the metric of the data, you'd work directly with the poster samples and exponentiate. 
+Since we used the log link, our model results are in the log metric, too. If you'd like them in the metric of the data, you'd work directly with the poster samples and exponentiate.
 
 ```{r}
 post <- 
@@ -197,7 +196,7 @@ sim1 %>%
   mutate(width = upper - lower) %>% 
   
   ggplot(aes(x = width)) +
-  geom_histogram(binwidth = .01)
+  geom_histogram(binwidth = 0.01)
 ```
 
 What if we wanted a mean width of 0.25 on the log scale? We might try the simulation with $n = 150$.
@@ -265,7 +264,7 @@ tibble(id = letters[1:5],
 
 If you're `b`, it appears you're the smart one in the group.
 
-Anyway, whether working with binomial or aggregated binomial data, we're interested in the probability a given trial will be 1. 
+Anyway, whether working with binomial or aggregated binomial data, we're interested in the probability a given trial will be 1.
 
 ### Logistic regression with binary data.
 
@@ -273,24 +272,24 @@ Taking binary data as a starting point, given $d$ data that includes a variable 
 
 $$
 \begin{align*}
-y_i                & \sim \text{Binomial} (n = 1, p_i) \\
-\text{logit} (p_i) & = \beta_0,
+y_i                        & \sim \text{Binomial} (n = 1, p_i) \\
+\operatorname{logit} (p_i) & = \beta_0,
 \end{align*}
 $$
 
-were the logit function id defined as the log odds
+were the logit function is defined as the log odds
 
 $$
-\text{logit} (p_i) = \text{log} \bigg (\frac{p_i}{1 - p_i} \bigg),
+\operatorname{logit} (p_i) = \operatorname{log} \bigg (\frac{p_i}{1 - p_i} \bigg),
 $$
 
 and thus
 
 $$
-\text{log} \bigg (\frac{p_i}{1 - p_i} \bigg) = \beta_0.
+\operatorname{log} \bigg (\frac{p_i}{1 - p_i} \bigg) = \beta_0.
 $$
 
-In those formulas, $\beta_0$ is the intercept. In a binomial model with no predictors [^2], the intercept $\beta_0$ is just the estimate for $p$, but in the log-odds metric. So yes, similar to the Poisson models, we typically use a link function with our binomial models. Instead of the log link, we use the logit because constrains the posterior for $p$ to values between 0 and 1. Just as the null value for a probability is .5, the null value for the parameters within a logistic regression model is typically 0. 
+In those formulas, $\beta_0$ is the intercept. In a binomial model with no predictors [^2], the intercept $\beta_0$ is just the estimate for $p$, but in the log-odds metric. So yes, similar to the Poisson models, we typically use a link function with our binomial models. Instead of the log link, we use the logit because constrains the posterior for $p$ to values between 0 and 1. Just as the null value for a probability is .5, the null value for the parameters within a logistic regression model is typically 0.
 
 As above with the Poisson, I'm not going to go into a full-blown tutorial on the binomial distribution or on logistic regression. For more thorough introductions, check out chapters 9 through 10 in McElreath's [*Statistical Rethinking*](https://xcelab.net/rm/statistical-rethinking/) or Agresti's [*Foundations of Linear and Generalized Linear Models*](https://www.wiley.com/en-us/Foundations+of+Linear+and+Generalized+Linear+Models-p-9781118730034).
 
@@ -439,14 +438,14 @@ We should also acknowledge that this was our first example of a power simulation
 
 It's no more difficult to simulate and work with aggregated binomial data. But since the mechanics for `brms::brm()` and thus the down-the-road simulation setup are a little different, we should practice. With our new setup, we'll consider a new example. Since .25 is the typical batting average, it might better sense to define the null hypothesis like this:
 
-$$H_0 \text{: } p = .25$$
+$$H_0 \text{: } p = .25.$$
 
 Consider a case where we had some intervention where we expected a new batting average of .35. How many trials would we need, then, to either reject $H_0$ or at least estimate $p$ with a satisfactory degree of precision? Here's what the statistical formula for the implied aggregated binomial model might look like:
 
 $$
 \begin{align*}
-y_i                & \sim \text{Binomial} (n, p_i) \\
-\text{logit} (p_i) & = \beta_0.
+y_i                        & \sim \text{Binomial} (n, p_i) \\
+\operatorname{logit} (p_i) & = \beta_0.
 \end{align*}
 $$
 
@@ -519,7 +518,7 @@ posterior_samples(fit3) %>%
   scale_y_continuous(NULL, breaks = NULL)
 ```
 
-Based on a single simulation, it looks like $n = 100$ won’t quite be enough to reject $H_0 \text{: } p = .25$ with a conventional 2-sided 95% interval. But it does look like we're in the ballpark and that our basic data + model setup will work for a larger-scale simulation. Here’s an example of how you might update our custom simulation function.
+Based on a single simulation, it looks like $n = 100$ won’t quite be enough to reject $H_0 \text{: } p = .25$ with a conventional 2-sided 95% interval. But it does look like we're in the ballpark and that our basic data + model setup will work for a larger-scale simulation. Here's an example of how you might update our custom simulation function.
 
 ```{r}
 sim_data_fit <- function(seed, n_trials) {
@@ -587,5 +586,5 @@ sessionInfo()
 
 [^1]: Yes, one can smoke half a cigarette or drink 1/3 of a drink. Ideally, we'd have the exact amount of nicotine in your blood at a given moment and over time and the same for the amount of alcohol in your system relative to your blood volume and such. But in practice, substance use researchers just don't tend to have access to data of that quality. Instead, we're typically stuck with simple counts. And I look forward to the day the right team of engineers, computer scientists, and substance use researchers (and whoever else I forgot to mention) release the cheap, non-invasive technology we need to passively measure these things. Until then: *How many standard servings of alcohol did you drink, last night?*
 
-[^2]: In case this is all new to you and you and you had the question in your mind: Yes, you can add predictors to the logistic regression model. Say we had a model with two predictors, $x_1$ and $x_2$. Our statistical model would then follow the form $\text{logit} (p_i) = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i}$.
+[^2]: In case this is all new to you and you and you had the question in your mind: Yes, you can add predictors to the logistic regression model. Say we had a model with two predictors, $x_1$ and $x_2$. Our statistical model would then follow the form $\operatorname{logit} (p_i) = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i}$.
 
